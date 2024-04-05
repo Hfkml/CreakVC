@@ -19,3 +19,6 @@ finetune/*
 finetune/*/*
 finetune/*/*/*
 *.pyc
+*.pt
+*.pth
+*.npy
