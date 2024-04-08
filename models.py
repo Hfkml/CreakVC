@@ -346,6 +346,7 @@ class SynthesizerTrn(nn.Module):
       self.enc_spk = SpeakerEncoder(model_hidden_size=gin_channels, model_embedding_size=gin_channels)
     if self.creak:
         self.enc_creak = CreakEncoder(input_size=1, model_embedding_size=1024)
+        self.enc_creak_flow = CreakEncoder(input_size=1, model_embedding_size=192)
 
   def forward(self, c, spec, g=None, mel=None, c_lengths=None, spec_lengths=None, creaks=None):
     if c_lengths == None:
@@ -363,6 +364,7 @@ class SynthesizerTrn(nn.Module):
     _, m_p, logs_p, _ = self.enc_p(c, c_lengths)
 
     z, m_q, logs_q, spec_mask = self.enc_q(spec, spec_lengths, g=g) 
+    z = z + self.enc_creak_flow(creaks)
     z_p = self.flow(z, spec_mask, g=g)
 
     z_slice, ids_slice = commons.rand_slice_segments(z, spec_lengths, self.segment_size)
@@ -380,6 +382,7 @@ class SynthesizerTrn(nn.Module):
     g = g.unsqueeze(-1)
 
     z_p, m_p, logs_p, c_mask = self.enc_p(c, c_lengths)
+    z = z + self.enc_creak_flow(creaks)
     z = self.flow(z_p, c_mask, g=g, reverse=True)
     o = self.dec(z * c_mask, g=g)
     

@@ -38,7 +38,7 @@ if __name__ == "__main__":
     cmodel.eval()
     print("Loaded WavLM.")
     
-    filenames = glob(f'{args.in_dir}/*/*.wav', recursive=True)
+    filenames = glob(f'{args.in_dir}/*.wav', recursive=True)
     
     for filename in tqdm(filenames):
         process(filename)

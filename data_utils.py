@@ -49,11 +49,19 @@ class TextAudioSpeakerLoader(torch.utils.data.Dataset):
         self.lengths = lengths
 
     def get_creak(self, filename):
-        if not 'no_creak' in filename:
-            #get a tensor of 1 for each sample of the wavfile
-            creak = torch.ones(1, os.path.getsize(filename) // (2 * self.hop_length))
-        else:
-            creak = torch.zeros(1, os.path.getsize(filename) // (2 * self.hop_length))
+        #if not 'no_creak' in filename:
+        #    #get a tensor of 1 for each sample of the wavfile
+        #    creak = torch.ones(1, os.path.getsize(filename) // (2 * self.hop_length))
+        #else:
+        #    creak = torch.zeros(1, os.path.getsize(filename) // (2 * self.hop_length))
+        #return creak
+        filename = filename.replace("wavs", "creak")
+        creak = np.load(filename.replace(".wav", ".npy"))
+        try:
+            creak = torch.from_numpy(creak).unsqueeze(0)
+        except:
+            print(filename)
+            raise
         return creak
 
     def get_audio(self, filename):
@@ -215,7 +223,8 @@ class TextAudioSpeakerCollate():
 
         if self.use_spk and self.creak:
             #shorten to c_padded size
-            creaks_padded = creaks_padded[:,:,:c_padded.size(2)]
+            #creaks_padded = creaks_padded[:,:,:c_padded.size(2)]
+            creaks_padded = commons.slice_segments(creaks_padded, ids_slice, spec_seglen)[:,:,:-1]
 
         if self.use_spk:
           return c_padded, spec_padded, wav_padded, spks, creaks_padded

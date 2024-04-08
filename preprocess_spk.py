@@ -52,7 +52,7 @@ if __name__ == "__main__":
     
     #split_list = ['train-clean-100', 'train-clean-360']
 
-    sub_folder_list = os.listdir(args.in_dir)
+    sub_folder_list = os.listdir(f'{args.in_dir}/wavs')
     sub_folder_list.sort()
     
     args.num_workers = args.num_workers if args.num_workers is not None else cpu_count()
@@ -61,12 +61,19 @@ if __name__ == "__main__":
     spk_embed_out_dir = os.path.join(args.out_dir_root, "spk")
     print("[INFO] spk_embed_out_dir: ", spk_embed_out_dir)
     os.makedirs(spk_embed_out_dir, exist_ok=True)
+    for item in sub_folder_list:
+        #make folders for the first four characters of the speaker name
+        os.makedirs(os.path.join(spk_embed_out_dir, item[:4]), exist_ok=True)
+
+    
 
     #for data_split in split_list:
     #    sub_folder_list = os.listdir(args.in_dir, data_split) 
     for spk in sub_folder_list:
+        spk = spk[:4]
         print("Preprocessing {} ...".format(spk))
-        in_dir = os.path.join(args.in_dir, spk)
+        in_dir = os.path.join(args.in_dir, 'wavs')
+        #,spk_
         if not os.path.isdir(in_dir): 
             continue
         #out_dir = os.path.join(args.out_dir, spk)

@@ -13,6 +13,9 @@
                 "-c", "configs/freevc.json",
                 "-m", "freevc"
             ],
+            //"args": [
+            //    "--in_dir", "finetune/train/",
+            //    "--out_dir", "finetune/train/"],
             "env": 
                 {
                     "CUDA_VISIBLE_DEVICES":"5,6,7"
