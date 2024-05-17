@@ -24,7 +24,7 @@ def generate_timestamp():
     # Return the formatted timestamp with the desired file extension
     return timestamp
 
-if len(sys.argv) != 6:
+if len(sys.argv) != 7:
     print("Usage: script.py <session_number> <system_persona affective/not_affective> <tts_system tacotron/tacotron_prosody/matcha>")
     sys.exit(1)
 source_path = sys.argv[1]
@@ -32,9 +32,10 @@ target_path1 = sys.argv[2]
 target_path2 = sys.argv[3]
 scaling_factor = float(sys.argv[4])
 output_audio = sys.argv[5]
+creak_value = int(sys.argv[6])
 
 wavlm_large_path = 'wavlm/WavLM-Large.pt'
-freevc_chpt_path = 'logs/models/freevc/G_20000.pth'
+freevc_chpt_path = 'logs/freevc2/G_190000.pth'
 
 logger = logging.getLogger()
 logger.setLevel(logging.CRITICAL)
@@ -77,7 +78,7 @@ wav_src = torch.from_numpy(wav_src).unsqueeze(0)
 
 c = utils.get_content(cmodel, wav_src)
 
-tgt_audio = net_g.infer(c, g=g_tgt)
+tgt_audio = net_g.infer(c, g=g_tgt, creaks=torch.tensor(np.zeros((1, 1, (wav_src.size(1)//320-1))), dtype=torch.float32)+creak_value)
 tgt_audio = tgt_audio[0][0].data.cpu().float().numpy()
 
 timestamp = generate_timestamp()

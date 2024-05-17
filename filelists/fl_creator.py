@@ -2,8 +2,8 @@ import glob
 from pathlib import Path
 import os
 
-fls = os.listdir('../DS_10283_3038/DR-VCTK/DR-VCTK/clean_testset_wav_16k')
+fls = os.listdir('../finetune/train/wavs')
 
-with open('test_vctk.txt', 'w') as f:
+with open('train_vctk.txt', 'w') as f:
     for fl in fls:
-        f.write('DS_10283_3038/DR-VCTK/DR-VCTK/clean_testset_wav_16k/' + fl + '\n')
+        f.write(f"./finetune/train/wavs/{fl}\n")

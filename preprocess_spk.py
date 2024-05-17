@@ -53,6 +53,8 @@ if __name__ == "__main__":
     #split_list = ['train-clean-100', 'train-clean-360']
 
     sub_folder_list = os.listdir(f'{args.in_dir}/wavs')
+    sub_folder_list = [x[:4] for x in sub_folder_list]
+    sub_folder_list = list(set(sub_folder_list))
     sub_folder_list.sort()
     
     args.num_workers = args.num_workers if args.num_workers is not None else cpu_count()

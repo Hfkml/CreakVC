@@ -90,7 +90,7 @@ class TextAudioSpeakerLoader(torch.utils.data.Dataset):
             spk = torch.from_numpy(np.load(spk_filename))
         
         if not self.use_sr:
-            c_filename = filename.replace(".wav", ".spec.pt")
+            c_filename = filename.replace(".wav", ".pt")
             c_filename = c_filename.replace("wavs", "ssl")
             c = torch.load(c_filename).squeeze(0)
             #current shape is (x, y), but it should be (1024, y) so pad

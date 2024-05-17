@@ -229,8 +229,10 @@ class CreakEncoder(torch.nn.Module):
         self.model_embedding_size = model_embedding_size
         
         # Define the linear layer
-        self.linear_a = nn.Linear(input_size, model_embedding_size)
-        self.linear_b = nn.Linear(model_embedding_size, 192)
+        self.linear = nn.Linear(input_size, model_embedding_size)
+        # Initialize with zeros
+        self.linear.weight.data.fill_(0)
+        self.linear.bias.data.fill_(0)
 
     def forward(self, x):
         # Perform linear transformation
@@ -238,14 +240,12 @@ class CreakEncoder(torch.nn.Module):
         x = x.permute(0, 2, 1)
         
         # Perform linear transformation
-        a = self.linear_a(x)
-        b = self.linear_b(a)
+        x = self.linear(x)
         
         # Transpose output tensor to have shape (batch_size, model_embedding_size, length)
-        a = a.permute(0, 2, 1)
-        b = b.permute(0, 2, 1)
+        x = x.permute(0, 2, 1)
         
-        return a,b
+        return x
         
   
         
@@ -349,7 +349,7 @@ class SynthesizerTrn(nn.Module):
       self.enc_spk = SpeakerEncoder(model_hidden_size=gin_channels, model_embedding_size=gin_channels)
     if self.creak:
         self.enc_creak = CreakEncoder(input_size=1, model_embedding_size=1024)
-        #self.enc_creak_flow = CreakEncoder(input_size=1, model_embedding_size=192)
+        self.enc_creak_flow = CreakEncoder(input_size=1, model_embedding_size=192)
 
   def forward(self, c, spec, g=None, mel=None, c_lengths=None, spec_lengths=None, creaks=None):
     if c_lengths == None:
@@ -358,7 +358,7 @@ class SynthesizerTrn(nn.Module):
       spec_lengths = (torch.ones(spec.size(0)) * spec.size(-1)).to(spec.device)
     
     if self.creak and creaks is not None:
-      c = c + self.enc_creak(creaks)[0]
+      c = c + self.enc_creak(creaks)
       
     if not self.use_spk:
       g = self.enc_spk(mel.transpose(1,2))
@@ -370,7 +370,7 @@ class SynthesizerTrn(nn.Module):
 #    if self.creak and creaks is not None: 
 #        z = z + self.enc_creak(creaks)[1]
     z_p = self.flow(z, spec_mask, g=g)
-    z_p = z_p + self.enc_creak(creaks)[1]
+    z_p = z_p + self.enc_creak_flow(creaks)
     z_slice, ids_slice = commons.rand_slice_segments(z, spec_lengths, self.segment_size)
     o = self.dec(z_slice, g=g)
     
@@ -390,8 +390,7 @@ class SynthesizerTrn(nn.Module):
     #    z_p = z_p + self.enc_creak(creaks)[1]
     z = self.flow(z_p, c_mask, g=g, reverse=True)
     if self.creak and creaks is not None:
-        z = z + self.enc_creak(creaks)[1]
-    z = z + self.enc_creak(creaks)[1]
+        z = z + self.enc_creak_flow(creaks)
     o = self.dec(z * c_mask, g=g)
     
     return o
