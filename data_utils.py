@@ -30,6 +30,7 @@ class TextAudioSpeakerLoader(torch.utils.data.Dataset):
         self.use_spk = hparams.model.use_spk
         self.spec_len = hparams.train.max_speclen
         self.creak = hparams.model.creak
+        self.cpps = hparams.model.cpps
 
         random.seed(1234)
         random.shuffle(self.audiopaths)
@@ -55,15 +56,25 @@ class TextAudioSpeakerLoader(torch.utils.data.Dataset):
         #else:
         #    creak = torch.zeros(1, os.path.getsize(filename) // (2 * self.hop_length))
         #return creak
-        filename = filename.replace("wavs", "cpps")
-        creak = np.load(filename.replace(".wav", ".npy"))
+        
+        filename_creak = filename.replace("wavs", "creak")
+        creak = np.load(filename_creak.replace(".wav", ".npy"))
+
         try:
             creak = torch.from_numpy(creak).unsqueeze(0)
         except:
             print(filename)
             raise
         return creak
-
+    def get_cpps(self, filename):
+        filename_cpps = filename.replace("wavs", "cpps")
+        cpps = np.load(filename_cpps.replace(".wav", ".npy"))
+        try:
+            cpps = torch.from_numpy(cpps).unsqueeze(0)
+        except:
+            print(filename)
+            raise
+        return cpps
     def get_audio(self, filename):
         audio, sampling_rate = load_wav_to_torch(filename)
         if sampling_rate != self.sampling_rate:
@@ -83,6 +94,9 @@ class TextAudioSpeakerLoader(torch.utils.data.Dataset):
 
         if self.creak:
             creak = self.get_creak(filename)
+        
+        if self.cpps:
+            cpps = self.get_cpps(filename)
             
         if self.use_spk:
             spk_filename = filename.replace(".wav", ".npy")
@@ -128,12 +142,18 @@ class TextAudioSpeakerLoader(torch.utils.data.Dataset):
         c = c[:, start:end]
         audio_norm = audio_norm[:, start*self.hop_length:end*self.hop_length]
         '''
-        if self.use_spk and self.creak:
+        if self.use_spk and self.creak and self.cpps:
+            return c, spec, audio_norm, spk, creak, cpps
+        elif self.use_spk and self.creak:
             return c, spec, audio_norm, spk, creak
-        if self.use_spk:
+        elif self.use_spk and self.cpps:
+            return c, spec, audio_norm, spk, cpps
+        elif self.use_spk:
             return c, spec, audio_norm, spk
         elif self.creak:
             return c, spec, audio_norm, creak
+        elif self.cpps:
+            return c, spec, audio_norm, cpps
         else:
             return c, spec, audio_norm
 
@@ -152,6 +172,7 @@ class TextAudioSpeakerCollate():
         self.use_sr = hps.train.use_sr
         self.use_spk = hps.model.use_spk
         self.creak = hps.model.creak
+        self.cpps = hps.model.cpps
 
     def __call__(self, batch):
         """Collate's training batch from normalized text, audio and speaker identities
@@ -167,13 +188,16 @@ class TextAudioSpeakerCollate():
         max_spec_len = max([x[1].size(1) for x in batch])
         max_wav_len = max([x[2].size(1) for x in batch])
         max_creak_len = max([x[4].size(1) for x in batch])
+        max_cpp_len = max([x[5].size(1) for x in batch])
 
         spec_lengths = torch.LongTensor(len(batch))
         wav_lengths = torch.LongTensor(len(batch))
         if self.use_spk:
             spks = torch.FloatTensor(len(batch), batch[0][3].size(0))
         if self.creak:
-            creaks = torch.FloatTensor(len(batch), batch[0][4].size(1))
+            creak = torch.FloatTensor(len(batch), batch[0][4].size(1))
+        if self.cpps:
+            cpps = torch.FloatTensor(len(batch), batch[0][5].size(1))
         else:
             spks = None
         
@@ -181,10 +205,13 @@ class TextAudioSpeakerCollate():
         spec_padded = torch.FloatTensor(len(batch), batch[0][1].size(0), max_spec_len)
         wav_padded = torch.FloatTensor(len(batch), 1, max_wav_len)
         creaks_padded = torch.FloatTensor(len(batch), 1, max_creak_len)
+        cpps_padded = torch.FloatTensor(len(batch), 1, max_cpp_len)
+
         c_padded.zero_()
         spec_padded.zero_()
         wav_padded.zero_()
         creaks_padded.zero_()
+        cpps_padded.zero_()
         
         for i in range(len(ids_sorted_decreasing)):
             row = batch[ids_sorted_decreasing[i]]
@@ -205,10 +232,19 @@ class TextAudioSpeakerCollate():
                 if self.creak:
                     creak = row[4]
                     creaks_padded[i, :, :creak.size(1)] = creak
+                if self.cpps:   
+                    cpps = row[5]
+                    cpps_padded[i, :, :cpps.size(1)] = cpps
 
             elif self.creak:
                 creak = row[3]
                 creaks_padded[i, :, :creak.size(1)] = creak
+                if self.cpps:
+                    cpps = row[4]
+                    cpps_padded[i, :, :cpps.size(1)] = cpps
+            elif self.cpps:
+                cpps = row[3]
+                cpps_padded[i, :, :cpps.size(1)] = cpps
         
         spec_seglen = spec_lengths[-1] if spec_lengths[-1] < self.hps.train.max_speclen + 1 else self.hps.train.max_speclen + 1
         wav_seglen = spec_seglen * self.hps.data.hop_length 
@@ -225,11 +261,22 @@ class TextAudioSpeakerCollate():
             #shorten to c_padded size
             #creaks_padded = creaks_padded[:,:,:c_padded.size(2)]
             creaks_padded = commons.slice_segments(creaks_padded, ids_slice, spec_seglen)[:,:,:-1]
+            if self.cpps:
+                cpps_padded = commons.slice_segments(cpps_padded, ids_slice, spec_seglen)[:,:,:-1]
 
-        if self.use_spk:
-          return c_padded, spec_padded, wav_padded, spks, creaks_padded
+        elif self.use_spk and self.cpps:
+            cpps_padded = commons.slice_segments(cpps_padded, ids_slice, spec_seglen)[:,:,:-1]
+
+        if self.use_spk and self.creak and self.cpps:
+          return c_padded, spec_padded, wav_padded, spks, creaks_padded, cpps_padded
+        elif self.use_spk and self.creak:
+            return c_padded, spec_padded, wav_padded, spks, creaks_padded
+        elif self.use_spk and self.cpps:
+            return c_padded, spec_padded, wav_padded, spks, cpps_padded
+        elif self.use_spk:
+            return c_padded, spec_padded, wav_padded, spks
         else:
-          return c_padded, spec_padded, wav_padded, creaks_padded
+          return c_padded, spec_padded, wav_padded
 
 
 class DistributedBucketSampler(torch.utils.data.distributed.DistributedSampler):

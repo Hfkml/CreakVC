@@ -50,6 +50,7 @@
     "gin_channels": 256,
     "ssl_dim": 1024,
     "use_spk": true,
-    "creak": true
+    "creak": true,
+    "cpps": true
   }
 }

@@ -317,6 +317,7 @@ class SynthesizerTrn(nn.Module):
     ssl_dim,
     use_spk,
     creak,
+    cpps,
     **kwargs):
 
     super().__init__()
@@ -339,6 +340,7 @@ class SynthesizerTrn(nn.Module):
     self.ssl_dim = ssl_dim
     self.use_spk = use_spk
     self.creak = creak
+    self.cpps = cpps
 
     self.enc_p = Encoder(ssl_dim, inter_channels, hidden_channels, 5, 1, 16)
     self.dec = Generator(inter_channels, resblock, resblock_kernel_sizes, resblock_dilation_sizes, upsample_rates, upsample_initial_channel, upsample_kernel_sizes, gin_channels=gin_channels)
@@ -350,8 +352,12 @@ class SynthesizerTrn(nn.Module):
     if self.creak:
         self.enc_creak = CreakEncoder(input_size=1, model_embedding_size=1024)
         self.enc_creak_flow = CreakEncoder(input_size=1, model_embedding_size=192)
+    if self.cpps:
+        self.enc_cpp = CreakEncoder(input_size=1, model_embedding_size=1024)
+        self.enc_cpp_flow = CreakEncoder(input_size=1, model_embedding_size=192)
 
-  def forward(self, c, spec, g=None, mel=None, c_lengths=None, spec_lengths=None, creaks=None):
+
+  def forward(self, c, spec, g=None, mel=None, c_lengths=None, spec_lengths=None, creaks=None, cpps=None):
     if c_lengths == None:
       c_lengths = (torch.ones(c.size(0)) * c.size(-1)).to(c.device)
     if spec_lengths == None:
@@ -359,6 +365,8 @@ class SynthesizerTrn(nn.Module):
     
     if self.creak and creaks is not None:
       c = c + self.enc_creak(creaks)
+    if self.cpps and cpps is not None:
+      c = c + self.enc_cpp(cpps)
       
     if not self.use_spk:
       g = self.enc_spk(mel.transpose(1,2))
@@ -370,19 +378,24 @@ class SynthesizerTrn(nn.Module):
 #    if self.creak and creaks is not None: 
 #        z = z + self.enc_creak(creaks)[1]
     z_p = self.flow(z, spec_mask, g=g)
-    z_p = z_p + self.enc_creak_flow(creaks)
+    if self.creak and creaks is not None:
+        z_p = z_p + self.enc_creak_flow(creaks)
+    if self.cpps and cpps is not None:
+        z_p = z_p + self.enc_cpp_flow(cpps)
     z_slice, ids_slice = commons.rand_slice_segments(z, spec_lengths, self.segment_size)
     o = self.dec(z_slice, g=g)
     
     return o, ids_slice, spec_mask, (z, z_p, m_p, logs_p, m_q, logs_q)
 
-  def infer(self, c, g=None, mel=None, c_lengths=None, creaks=None):
+  def infer(self, c, g=None, mel=None, c_lengths=None, creaks=None, cpps=None):
     if c_lengths == None:
       c_lengths = (torch.ones(c.size(0)) * c.size(-1)).to(c.device)
     if not self.use_spk:
       g = self.enc_spk.embed_utterance(mel.transpose(1,2))
     if self.creak and creaks is not None:
         c = c + self.enc_creak(creaks)[0]
+    if self.cpps and cpps is not None:
+        c = c + self.enc_cpp(cpps)[0]
     g = g.unsqueeze(-1)
 
     z_p, m_p, logs_p, c_mask = self.enc_p(c, c_lengths)
@@ -391,6 +404,8 @@ class SynthesizerTrn(nn.Module):
     z = self.flow(z_p, c_mask, g=g, reverse=True)
     if self.creak and creaks is not None:
         z = z + self.enc_creak_flow(creaks)
+    if self.cpps and cpps is not None:
+        z = z + self.enc_cpp_flow(cpps)
     o = self.dec(z * c_mask, g=g)
     
     return o

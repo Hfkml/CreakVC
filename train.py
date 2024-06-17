@@ -141,10 +141,13 @@ def train_and_evaluate(rank, epoch, hps, nets, optims, schedulers, scaler, loade
   net_d.train()
   for batch_idx, items in enumerate(train_loader):
     
-    if hps.model.use_spk and hps.model.creak:
-      c, spec, y, spk, creaks = items
+    if hps.model.use_spk and hps.model.creak and hps.model.cpps:
+      c, spec, y, spk, creaks, cpps = items
       g = spk.cuda(rank, non_blocking=True)
       #creak = creak.cuda(rank, non_blocking=True)
+    elif hps.model.use_spk and hps.model.creak:
+      c, spec, y, spk, creaks = items
+      g = spk.cuda(rank, non_blocking=True)
     elif hps.model.use_spk:
       c, spec, y, spk = items
       g = spk.cuda(rank, non_blocking=True)
@@ -155,6 +158,9 @@ def train_and_evaluate(rank, epoch, hps, nets, optims, schedulers, scaler, loade
     c = c.cuda(rank, non_blocking=True)
     if hps.model.creak:
       creaks = creaks.cuda(rank, non_blocking=True)
+    if hps.model.cpps:
+      cpps = cpps.cuda(rank, non_blocking=True)
+
     mel = spec_to_mel_torch(
           spec, 
           hps.data.filter_length, 
@@ -165,7 +171,7 @@ def train_and_evaluate(rank, epoch, hps, nets, optims, schedulers, scaler, loade
 
     with autocast(enabled=hps.train.fp16_run):
       y_hat, ids_slice, z_mask,\
-      (z, z_p, m_p, logs_p, m_q, logs_q) = net_g(c, spec, g=g, mel=mel, creaks=creaks if hps.model.creak else None)
+      (z, z_p, m_p, logs_p, m_q, logs_q) = net_g(c, spec, g=g, mel=mel, creaks=creaks if hps.model.creak else None, cpps=cpps if hps.model.cpps else None)
       
       y_mel = commons.slice_segments(mel, ids_slice, hps.train.segment_size // hps.data.hop_length)
       y_hat_mel = mel_spectrogram_torch(
@@ -247,7 +253,12 @@ def evaluate(hps, generator, eval_loader, writer_eval):
     generator.eval()
     with torch.no_grad():
       for batch_idx, items in enumerate(eval_loader):
-        if hps.model.use_spk and hps.model.creak:
+        if hps.model.use_spk and hps.model.creak and hps.model.cpps:
+          c, spec, y, spk, creaks, cpps = items
+          g = spk[:1].cuda(0)
+          creaks = creaks[:1].cuda(0)
+          cpps = cpps[:1].cuda(0)
+        elif hps.model.use_spk and hps.model.creak:
           c, spec, y, spk, creaks = items
           g = spk[:1].cuda(0)
           creaks = creaks[:1].cuda(0)
@@ -267,7 +278,7 @@ def evaluate(hps, generator, eval_loader, writer_eval):
         hps.data.sampling_rate,
         hps.data.mel_fmin, 
         hps.data.mel_fmax)
-      y_hat = generator.module.infer(c, g=g, mel=mel, creaks=creaks if hps.model.creak else None)
+      y_hat = generator.module.infer(c, g=g, mel=mel, creaks=creaks if hps.model.creak else None, cpps=cpps if hps.model.cpps else None)
       
       y_hat_mel = mel_spectrogram_torch(
         y_hat.squeeze(1).float(),
