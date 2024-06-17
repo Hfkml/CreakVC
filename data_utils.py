@@ -55,7 +55,7 @@ class TextAudioSpeakerLoader(torch.utils.data.Dataset):
         #else:
         #    creak = torch.zeros(1, os.path.getsize(filename) // (2 * self.hop_length))
         #return creak
-        filename = filename.replace("wavs", "creak")
+        filename = filename.replace("wavs", "cpps")
         creak = np.load(filename.replace(".wav", ".npy"))
         try:
             creak = torch.from_numpy(creak).unsqueeze(0)
