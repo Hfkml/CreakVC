@@ -142,7 +142,11 @@ def train_and_evaluate(rank, epoch, hps, nets, optims, schedulers, scaler, loade
   for batch_idx, items in enumerate(train_loader):
     
     if hps.model.use_spk and hps.model.creak and hps.model.cpps:
-      c, spec, y, spk, creaks, cpps = items
+      try:
+        c, spec, y, spk, creaks, cpps = items
+      except:
+        print(items)
+        continue
       g = spk.cuda(rank, non_blocking=True)
       #creak = creak.cuda(rank, non_blocking=True)
     elif hps.model.use_spk and hps.model.creak:
