@@ -13,7 +13,6 @@ synth_data
 synth_data/*
 wavlm
 wavlm/*
-speaker_encoder/ckpt/*
 finetune
 finetune/*
 finetune/*/*
