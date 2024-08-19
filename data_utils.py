@@ -158,6 +158,7 @@ class TextAudioSpeakerLoader(torch.utils.data.Dataset):
             return c, spec, audio_norm
 
     def __getitem__(self, index):
+        #print(self.audiopaths[index][0])
         return self.get_audio(self.audiopaths[index][0])
 
     def __len__(self):

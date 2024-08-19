@@ -24,11 +24,20 @@ def build_from_path(in_dir, out_dir, weights_fpath, num_workers=1):
 
 def _compute_spkEmbed(out_dir, wav_path, weights_fpath):
     utt_id = os.path.basename(wav_path).rstrip(".wav")
+    #print(wav_path)
     fpath = Path(wav_path)
     wav = preprocess_wav(fpath)
 
     encoder = SpeakerEncoder(weights_fpath)
-    embed = encoder.embed_utterance(wav)
+    try:
+        embed = encoder.embed_utterance(wav)
+    except Exception as e:
+        print(f"Error: {e}")
+        print(f"Error: {utt_id}")
+        #save the error and the utterance id
+        with open("error2.txt", "a") as f:
+            f.write(f"{utt_id}\n")
+        return None
     fname_save = os.path.join(out_dir, f"{utt_id}.npy")
     np.save(fname_save, embed, allow_pickle=False)
     return os.path.basename(fname_save)
@@ -42,7 +51,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('--in_dir', type=str, 
         default='dataset/vctk-16k/')
-    parser.add_argument('--num_workers', type=int, default=12)
+    parser.add_argument('--num_workers', type=int, default=40)
     parser.add_argument('--out_dir_root', type=str, 
         default='dataset')
     parser.add_argument('--spk_encoder_ckpt', type=str, \
@@ -73,7 +82,7 @@ if __name__ == "__main__":
     #    sub_folder_list = os.listdir(args.in_dir, data_split) 
     for spk in sub_folder_list:
         spk = spk[:4]
-        print("Preprocessing {} ...".format(spk))
+        #print("Preprocessing {} ...".format(spk))
         in_dir = os.path.join(args.in_dir, 'wavs')
         #,spk_
         if not os.path.isdir(in_dir): 
