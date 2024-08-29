@@ -29,8 +29,8 @@ and multimedia production.
 
 CreakVC requires the following in order to work:
 * Clone the CreakVC repository ````git clone https://github.com/Hfkml/CreakVC/````
-* Download the CreakVC checkpoint
+* Navigate to the repository and run ````pip install -r requirements.txt````
 * Download [WavLM](https://github.com/microsoft/unilm/tree/master/wavlm) and save it in the folder ````wavlm/````
-* Download the pretrained G_CreakVC.pth model from the Github release
+* Download the pretrained G_CreakVC.pth model from the Github release (on the right of your screen)
 * Open CreakVC.ipynb
 * Watch [this video](https://play.kth.se/media/Show%20and%20Tell%20/0_hpyq9vy1) for instructions
