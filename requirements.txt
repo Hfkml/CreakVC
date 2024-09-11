@@ -1,12 +1,13 @@
 glob2==0.7
 tqdm==4.62.3
 librosa==0.8.1
-numba==0.55
+numba==0.56.3
 numpy==1.21.6
 scipy==1.10.1
 tensorboard==2.7.0
-torch==1.10.0
-torchvision==0.10.0
+torch==2.3.0
+torchvision
+torchaudio
 pandas==2.0.3
 plotly
 praatio<=5.0.0
@@ -19,3 +20,5 @@ rich>=13.2.0
 scikit-learn>=1.2.0
 ruamel.yaml==0.17.21
 webrtcvad==2.0.10
+nbformat>=4.2.0
+whisperx
