@@ -1,9 +1,9 @@
-import glob
+from glob import glob
 from pathlib import Path
 import os
 
-fls = os.listdir('../finetune/train/wavs')
+fls = glob('/nfs/deepspeech/home/lameris/libri_train/test/wavs/*.wav')
 
-with open('train_vctk.txt', 'w') as f:
+with open('test_libri.txt', 'w') as f:
     for fl in fls:
-        f.write(f"./finetune/train/wavs/{fl}\n")
+        f.write(f"/nfs/deepspeech/home/lameris/libri_train/test/wavs/{Path(fl).stem}.wav\n")
