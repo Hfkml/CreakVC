@@ -25,14 +25,14 @@ def plot(X_test: pd.DataFrame,
     )
     df['creak_threshold'] = _config['creak_threshold']
    
-    df = df.drop(columns=['zcr', 'ste', 'hnr', 'jitter', 'h1h2', 'shimmer', 'f0mean'])
-    #features = ['f0mean']
+    df = df.drop(columns=['zcr', 'ste', 'hnr', 'jitter', 'shimmer', 'f0mean'])
+    features = ['h1h2']
     #drop rows before t0, note that t0 is in seconds and the columns are in windowed frames
     first_index = int(t0//_config['hop_size'])-2
     last_index = int(words[-1]['end']//_config['hop_size'])-3
     df = df.iloc[first_index:last_index]
     df_norm = df.copy()
-    #df_norm[features] = df[features].apply(lambda x: x/x.abs().max(), axis=0)
+    df_norm[features] = df[features].apply(lambda x: (x/x.abs().max()+1)/2, axis=0)
     #dt = get_time_vector(y_pred, sr, t0)
     dt = get_time_vector(y_pred[first_index:last_index], sr, t0)
     

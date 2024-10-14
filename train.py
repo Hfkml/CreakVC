@@ -140,30 +140,49 @@ def train_and_evaluate(rank, epoch, hps, nets, optims, schedulers, scaler, loade
   net_g.train()
   net_d.train()
   for batch_idx, items in enumerate(train_loader):
-    
-    if hps.model.use_spk and hps.model.creak and hps.model.cpps:
-      try:
-        c, spec, y, spk, creaks, cpps = items
-      except:
-        print(items)
-        continue
-      g = spk.cuda(rank, non_blocking=True)
-      #creak = creak.cuda(rank, non_blocking=True)
-    elif hps.model.use_spk and hps.model.creak:
-      c, spec, y, spk, creaks = items
-      g = spk.cuda(rank, non_blocking=True)
-    elif hps.model.use_spk:
-      c, spec, y, spk = items
-      g = spk.cuda(rank, non_blocking=True)
-    else:
-      c, spec, y = items
-      g = None
+    try:
+    # Basic required parameters
+      c, spec, y = items[:3]
+
+      # Optional parameters: spk, creaks, cpps, h1h2, pitch
+      optional_idx = 3  # Start at the 4th item
+      spk = creaks = cpps = h1h2s = pitches = None  # Initialize all optional variables
+
+      if hps.model.use_spk:
+          spk = items[optional_idx]
+          optional_idx += 1
+
+      if hps.model.creak:
+          creaks = items[optional_idx]
+          optional_idx += 1
+
+      if hps.model.cpps:
+          cpps = items[optional_idx]
+          optional_idx += 1
+
+      if hps.model.h1h2:
+          h1h2s = items[optional_idx]
+          optional_idx += 1
+
+      if hps.model.pitch:
+          pitches = items[optional_idx]
+
+    except Exception as e:
+      print(f"Error unpacking items: {e}, Items: {items}")
+      continue
+
+    g = spk.cuda(rank, non_blocking=True) if spk is not None else None
     spec, y = spec.cuda(rank, non_blocking=True), y.cuda(rank, non_blocking=True)
     c = c.cuda(rank, non_blocking=True)
-    if hps.model.creak:
+
+    if creaks is not None:
       creaks = creaks.cuda(rank, non_blocking=True)
-    if hps.model.cpps:
+    if cpps is not None:
       cpps = cpps.cuda(rank, non_blocking=True)
+    if h1h2s is not None:
+      h1h2s = h1h2s.cuda(rank, non_blocking=True)
+    if pitches is not None:
+      pitches = pitches.cuda(rank, non_blocking=True)
 
     mel = spec_to_mel_torch(
           spec, 
@@ -175,7 +194,7 @@ def train_and_evaluate(rank, epoch, hps, nets, optims, schedulers, scaler, loade
 
     with autocast(enabled=hps.train.fp16_run):
       y_hat, ids_slice, z_mask,\
-      (z, z_p, m_p, logs_p, m_q, logs_q) = net_g(c, spec, g=g, mel=mel, creaks=creaks if hps.model.creak else None, cpps=cpps if hps.model.cpps else None)
+      (z, z_p, m_p, logs_p, m_q, logs_q) = net_g(c, spec, g=g, mel=mel, creaks=creaks if hps.model.creak else None, cpps=cpps if hps.model.cpps else None, h1h2s=h1h2s if hps.model.h1h2 else None, pitches=pitches if hps.model.pitch else None)
       
       y_mel = commons.slice_segments(mel, ids_slice, hps.train.segment_size // hps.data.hop_length)
       y_hat_mel = mel_spectrogram_torch(
@@ -257,24 +276,52 @@ def evaluate(hps, generator, eval_loader, writer_eval):
     generator.eval()
     with torch.no_grad():
       for batch_idx, items in enumerate(eval_loader):
-        if hps.model.use_spk and hps.model.creak and hps.model.cpps:
-          c, spec, y, spk, creaks, cpps = items
-          g = spk[:1].cuda(0)
-          creaks = creaks[:1].cuda(0)
-          cpps = cpps[:1].cuda(0)
-        elif hps.model.use_spk and hps.model.creak:
-          c, spec, y, spk, creaks = items
-          g = spk[:1].cuda(0)
-          creaks = creaks[:1].cuda(0)
-        elif hps.model.use_spk:
-          c, spec, y, spk = items
-          g = spk[:1].cuda(0)
-        else:
-          c, spec, y = items
-          g = None
-        spec, y = spec[:1].cuda(0), y[:1].cuda(0)
-        c = c[:1].cuda(0)
-        break
+          try:
+              # Basic required parameters
+              c, spec, y = items[:3]
+
+              # Optional parameters: spk, creaks, cpps, h1h2, pitch
+              optional_idx = 3  # Start at the 4th item
+              spk = creaks = cpps = h1h2 = pitch = None  # Initialize all optional variables
+
+              if hps.model.use_spk:
+                  spk = items[optional_idx]
+                  optional_idx += 1
+
+              if hps.model.creak:
+                  creaks = items[optional_idx]
+                  optional_idx += 1
+
+              if hps.model.cpps:
+                  cpps = items[optional_idx]
+                  optional_idx += 1
+
+              if hps.model.h1h2:
+                  h1h2s = items[optional_idx]
+                  optional_idx += 1
+
+              if hps.model.pitch:
+                  pitches = items[optional_idx]
+
+          except Exception as e:
+              print(f"Error unpacking items: {e}, Items: {items}")
+              continue
+
+          g = spk[:1].cuda(0) if spk is not None else None
+          spec, y = spec[:1].cuda(0), y[:1].cuda(0)
+          c = c[:1].cuda(0)
+
+          if creaks is not None:
+              creaks = creaks[:1].cuda(0)
+          if cpps is not None:
+              cpps = cpps[:1].cuda(0)
+          if h1h2s is not None:
+              h1h2s = h1h2s[:1].cuda(0)
+          if pitches is not None:
+              pitches = pitches[:1].cuda(0)
+
+          # Exit after the first batch
+          break
       mel = spec_to_mel_torch(
         spec, 
         hps.data.filter_length, 
